@@ -143,6 +143,24 @@ class ParkingApiIT {
     }
 
     @Test
+    void coveredCityWithNoParkingInTheRadiusGivesAnEmptyList() throws Exception {
+        stubProvider(PROVIDER_BODY);
+
+        search("?lat=46.65&lon=0.45&radius=100") // inside Poitiers coverage, far from every parking
+            .andExpect(status().isOk())
+            .andExpect(content().json("{\"parkings\":[]}", true));
+    }
+
+    @Test
+    void providerWithoutAnyParkingGivesAnEmptyList() throws Exception {
+        stubProvider("{\"total\":0,\"results\":[]}");
+
+        search(QUERY)
+            .andExpect(status().isOk())
+            .andExpect(content().json("{\"parkings\":[]}", true));
+    }
+
+    @Test
     void positionInNoCoveredCityGivesA404() throws Exception {
         search("?lat=48.8566&lon=2.3522&radius=1000") // Paris
             .andExpect(status().isNotFound())
@@ -155,7 +173,9 @@ class ParkingApiIT {
         search("?lat=95&lon=7.12").andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.status").value(400));
         search("?lat=43.58&lon=7.12&radius=999999").andExpect(status().isBadRequest());
+        search("").andExpect(status().isBadRequest());
         search("?lat=43.58").andExpect(status().isBadRequest());
+        search("?lat=43.58&lon=NaN").andExpect(status().isBadRequest());
         search("?lat=abc&lon=7.12").andExpect(status().isBadRequest());
     }
 

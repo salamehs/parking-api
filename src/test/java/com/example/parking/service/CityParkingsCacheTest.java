@@ -12,6 +12,10 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,7 +40,7 @@ class CityParkingsCacheTest {
         cache.get(POITIERS);
         List<Parking> second = cache.get(POITIERS);
 
-        assertThat(provider.calls).isEqualTo(1);
+        assertThat(provider.calls.get()).isEqualTo(1);
         assertThat(second).extracting(Parking::getName).containsExactly("THEATRE");
     }
 
@@ -46,7 +50,7 @@ class CityParkingsCacheTest {
         cache.get(TOURS);
         cache.get(POITIERS);
 
-        assertThat(provider.calls).isEqualTo(2);
+        assertThat(provider.calls.get()).isEqualTo(2);
     }
 
     @Test
@@ -55,11 +59,30 @@ class CityParkingsCacheTest {
 
         passTime(TTL.minusSeconds(1));
         cache.get(POITIERS);
-        assertThat(provider.calls).isEqualTo(1);
+        assertThat(provider.calls.get()).isEqualTo(1);
 
         passTime(Duration.ofSeconds(2));
         cache.get(POITIERS);
-        assertThat(provider.calls).isEqualTo(2);
+        assertThat(provider.calls.get()).isEqualTo(2);
+    }
+
+    @Test
+    void concurrentRequestsForTheSameCityShareOneProviderCall() throws Exception {
+        provider.delayMillis = 200;
+        ExecutorService executor = Executors.newFixedThreadPool(8);
+        try {
+            List<Future<List<Parking>>> results = new ArrayList<>();
+            for (int i = 0; i < 8; i++) {
+                results.add(executor.submit(() -> cache.get(POITIERS)));
+            }
+            for (Future<List<Parking>> result : results) {
+                assertThat(result.get()).hasSize(1);
+            }
+        } finally {
+            executor.shutdownNow();
+        }
+
+        assertThat(provider.calls.get()).isEqualTo(1);
     }
 
     @Test
@@ -69,7 +92,7 @@ class CityParkingsCacheTest {
 
         provider.failure = null;
         assertThat(cache.get(POITIERS)).hasSize(1);
-        assertThat(provider.calls).isEqualTo(2);
+        assertThat(provider.calls.get()).isEqualTo(2);
     }
 
     @Test
@@ -79,7 +102,7 @@ class CityParkingsCacheTest {
         disabled.get(POITIERS);
         disabled.get(POITIERS);
 
-        assertThat(provider.calls).isEqualTo(2);
+        assertThat(provider.calls.get()).isEqualTo(2);
     }
 
     @Test
@@ -89,7 +112,7 @@ class CityParkingsCacheTest {
         cache.clear();
         cache.get(POITIERS);
 
-        assertThat(provider.calls).isEqualTo(2);
+        assertThat(provider.calls.get()).isEqualTo(2);
     }
 
     @Test
@@ -107,8 +130,9 @@ class CityParkingsCacheTest {
      */
     private static final class FakeProvider implements ParkingProvider {
         final List<Parking> parkings = new ArrayList<>(List.of(Parking.builder().name("THEATRE").build()));
-        int calls;
-        ProviderException failure;
+        final AtomicInteger calls = new AtomicInteger();
+        volatile long delayMillis;
+        volatile ProviderException failure;
 
         @Override
         public String type() {
@@ -117,7 +141,14 @@ class CityParkingsCacheTest {
 
         @Override
         public List<Parking> findAll(ProviderConfig config) {
-            calls++;
+            calls.incrementAndGet();
+            if (delayMillis > 0) {
+                try {
+                    Thread.sleep(delayMillis);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
             if (failure != null) {
                 throw failure;
             }

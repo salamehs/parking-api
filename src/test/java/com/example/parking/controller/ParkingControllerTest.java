@@ -73,12 +73,18 @@ class ParkingControllerTest {
         "?lat=95&lon=0.3              | lat must be between -90 and 90",
         "?lat=-90.1&lon=0.3           | lat must be between -90 and 90",
         "?lat=NaN&lon=0.3             | lat must be between -90 and 90",
+        "?lat=Infinity&lon=0.3        | lat must be between -90 and 90",
         "?lat=46.5&lon=181            | lon must be between -180 and 180",
+        "?lat=46&lon=-180.1           | lon must be between -180 and 180",
+        "?lat=46.5&lon=NaN            | lon must be between -180 and 180",
+        "?lat=46.5&lon=0.3&radius=-5   | radius must be between 1 and 5000",
         "?lat=46.5&lon=0.3&radius=0    | radius must be between 1 and 5000",
         "?lat=46.5&lon=0.3&radius=5001 | radius must be between 1 and 5000",
         "?lat=46.5                    | lon",
         "?lon=0.3                     | lat",
         "?lat=abc&lon=0.3             | lat",
+        "?lat=&lon=0.3                | lat",
+        "?lat=46.5&lon=0.3&radius=abc | radius",
         "?lat=46.5&lon=0.3&radius=1.5  | radius"})
     void invalidParameterGivesA400NamingTheParameter(String query, String expectedDetail) throws Exception {
         search(query)
@@ -88,6 +94,35 @@ class ParkingControllerTest {
             .andExpect(jsonPath("$.detail", containsString(expectedDetail)));
 
         verifyNoInteractions(parkingService);
+    }
+
+    @Test
+    void missingCoordinatesGiveA400() throws Exception {
+        search("")
+            .andExpect(status().isBadRequest())
+            .andExpect(content().contentTypeCompatibleWith(PROBLEM_JSON))
+            .andExpect(jsonPath("$.detail", containsString("lat")));
+
+        verifyNoInteractions(parkingService);
+    }
+
+    @ParameterizedTest(name = "{0} is accepted")
+    @CsvSource({"90,180,1", "-90,-180,5000", "0,0,1000"})
+    void valuesOnTheEdgeOfTheRangesAreAccepted(double lat, double lon, int radius) throws Exception {
+        when(parkingService.findNearby(any())).thenReturn(List.of());
+
+        search("?lat=" + lat + "&lon=" + lon + "&radius=" + radius).andExpect(status().isOk());
+
+        verify(parkingService).findNearby(new SearchCriteria(lat, lon, radius));
+    }
+
+    @Test
+    void noParkingFoundGivesA200WithAnEmptyList() throws Exception {
+        when(parkingService.findNearby(any())).thenReturn(List.of());
+
+        search("?lat=46.5838&lon=0.3377")
+            .andExpect(status().isOk())
+            .andExpect(content().json("{\"parkings\":[]}", true));
     }
 
     @Test

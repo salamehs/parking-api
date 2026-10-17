@@ -1,9 +1,8 @@
 # Parking API
-
-A REST API that returns the parkings near a position, nearest first, with their free places in real time. It serves several cities: each city has its own data provider (URL and payload format), but the API a mobile or web client sees is **the same for every city**. Today one provider is implemented, Grand Poitiers' open data.
+A REST API that finds parking places near a position. It returns the nearest parking places first and shows how many free spaces are available.
+It works for several cities. Each city has its own data source, but web and mobile apps always use the same API. 
 
 ## 1. What was done, how and why
-
 ### The API
 ```
 GET /api/v1/parkings?lat=46.5838&lon=0.3377&radius=1000
@@ -42,9 +41,9 @@ Every error is an RFC 9457 body (`application/problem+json`), for example:
 |---|---|---|---|
 | 400 | Bad Request | `lat`, `lon` or `radius` out of range (`NaN` included) | `Invalid request parameters: ` + e.g. `lat must be between -90 and 90` |
 | 400 | Bad Request | missing or non-numeric parameter | e.g. `Required parameter 'lat' is not present.` |
-| 404 | City not covered | the position is in no configured city | `No supported city at this position` |
+| 404 | City not covered | the position does not belong to any configured city | `No supported city at this position` |
 | 404 | Not Found | unknown path | |
-| 405 | Method Not Allowed | anything but `GET` | |
+| 405 | Method Not Allowed | `POST`, `PUT`, `PATCH`, `DELETE` (`HEAD` and `OPTIONS` are accepted) | |
 | 500 | Internal Server Error | unexpected error, logged with its stack trace | `An unexpected error occurred` |
 | 502 | Provider failure | the city's provider answered an HTTP error, an unreadable or empty body, or is unreachable | `The parking data source is currently unavailable` |
 | 504 | Provider timeout | the city's provider did not answer within the city's `timeout` | `The parking data source did not answer in time` |
@@ -67,7 +66,7 @@ Internal details (provider URL, provider error, stack trace) are logged, never r
 - **Tests at different levels:** Unit tests cover business logic, mapping, caching, HTTP calls, and web validation. Integration tests verify the full application using mocked providers, including error scenarios and OpenAPI export.
 - **OpenAPI documentation:** The API spec is generated from code and validated against the implementation. It is available in JSON and YAML formats, and Swagger UI provides an interactive interface for testing.
 - **Docker multi-stage build:** The Dockerfile uses a multi-stage build to produce a small image with only the JRE and a non-root user.
-- **CI/CD:** GitHub Actions runs tests and builds the Docker image on every push. The OpenAPI spec is exported to `docs/` for documentation.
+- **CI/CD:** GitHub Actions runs the tests and builds the Docker image on pushes to `main` and branches matching `feature/**` and on pull requests to `main`. The OpenAPI spec is exported to `docs/` for documentation.
 
 ### Run, test, document
 
@@ -90,7 +89,7 @@ curl "http://localhost:8080/api/v1/parkings?lat=46.5838&lon=0.3377&radius=1000"
 The following improvements were identified in this project and should be implemented in a real-world project.
 
 ### Performance and Shared Cache
-- **Shared cache:** The current cache is stored in memory, so each application instance has its own data. In a real project, use a shared cache such as Redis to keep data consistent across instances and reduce calls to external providers.
+- **Shared cache:** The current cache is stored in memory, so each application instance has its own data. In a real project, use a shared cache like Redis to keep data consistent across instances and reduce calls to external providers.
 - **Pagination:** The Poitiers API returns all parking locations at once. Other providers may use pagination, so the application should support fetching all pages when needed.
 
 ### Resilience and Error Handling
@@ -105,6 +104,6 @@ The following improvements were identified in this project and should be impleme
 - **Spatial indexing:** Use an in-memory spatial index refreshed periodically to find the correct city efficiently without querying the database for every request.
 
 ## 3. Functional suggestions
-- Add the last updated timestamp of the provider data in the response, so clients can see if the free places count is real time or outdated.
-- Decide what to do with parkings without coordinates: return them to the client without the coordinates or ignore them ? Currently, they are ignored, but it might be better to return them without coordinates, so the mobile app can display them in a list and not just on a map. 
-- Currently, if 2 cities matches we return the closest to the center. Maybe it would be better to call in this case both providers and merge the results, so the user can see the nearest parkings even if they are in another city. This would be useful for people living near the border of 2 cities.
+- **Add the provider data update time:** Include the date and time when the parking data was last updated in the API response. This helps clients know whether the number of available spaces is recent or potentially outdated.
+- **Return parkings without coordinates:** Currently, parkings without coordinates are ignored. An alternative is to return them without coordinates, allowing mobile applications to display them in a list even when they cannot be shown on a map.
+- **Search across multiple cities:** Currently, when a location matches two cities, the API selects the city with the nearest center. Instead, it could query both cities and merge the results. This would help users living near city borders find nearby parkings in either city.

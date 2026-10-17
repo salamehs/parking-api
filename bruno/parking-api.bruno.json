@@ -1,0 +1,768 @@
+{
+  "name": "parking-api",
+  "version": "1",
+  "items": [
+    {
+      "type": "http-request",
+      "name": "Search parkings",
+      "seq": 1,
+      "request": {
+        "url": "{{baseUrl}}/api/v1/parkings?lat={{lat}}&lon={{lon}}&radius={{radius}}",
+        "method": "GET",
+        "headers": [],
+        "params": [
+          {
+            "name": "lat",
+            "value": "{{lat}}",
+            "type": "query",
+            "enabled": true
+          },
+          {
+            "name": "lon",
+            "value": "{{lon}}",
+            "type": "query",
+            "enabled": true
+          },
+          {
+            "name": "radius",
+            "value": "{{radius}}",
+            "type": "query",
+            "enabled": true
+          }
+        ],
+        "body": {
+          "mode": "none"
+        },
+        "auth": {
+          "mode": "none"
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [
+          {
+            "name": "res.status",
+            "value": "eq 200",
+            "enabled": true
+          },
+          {
+            "name": "res.body.parkings",
+            "value": "isArray",
+            "enabled": true
+          }
+        ],
+        "tests": "test(\"sorted by distance, nearest first\", function () {\n  const d = res.body.parkings.map(p => p.distanceMeters);\n  expect(d).to.deep.equal([...d].sort((a, b) => a - b));\n});\ntest(\"every parking is within the radius\", function () {\n  res.body.parkings.forEach(p => expect(p.distanceMeters).to.be.at.most(Number(bru.getEnvVar(\"radius\"))));\n});\ntest(\"parkings follow the public contract\", function () {\n  res.body.parkings.forEach(p => {\n    expect(p).to.have.all.keys(\"name\", \"latitude\", \"longitude\", \"distanceMeters\", \"availableSpaces\", \"totalSpaces\");\n  });\n});",
+        "docs": ""
+      }
+    },
+    {
+      "type": "http-request",
+      "name": "Search parkings - default radius (1000 m)",
+      "seq": 2,
+      "request": {
+        "url": "{{baseUrl}}/api/v1/parkings?lat={{lat}}&lon={{lon}}",
+        "method": "GET",
+        "headers": [],
+        "params": [
+          {
+            "name": "lat",
+            "value": "{{lat}}",
+            "type": "query",
+            "enabled": true
+          },
+          {
+            "name": "lon",
+            "value": "{{lon}}",
+            "type": "query",
+            "enabled": true
+          }
+        ],
+        "body": {
+          "mode": "none"
+        },
+        "auth": {
+          "mode": "none"
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [
+          {
+            "name": "res.status",
+            "value": "eq 200",
+            "enabled": true
+          }
+        ],
+        "tests": "test(\"every parking is within 1000 m\", function () {\n  res.body.parkings.forEach(p => expect(p.distanceMeters).to.be.at.most(1000));\n});",
+        "docs": ""
+      }
+    },
+    {
+      "type": "http-request",
+      "name": "Search parkings - small radius",
+      "seq": 3,
+      "request": {
+        "url": "{{baseUrl}}/api/v1/parkings?lat={{lat}}&lon={{lon}}&radius=100",
+        "method": "GET",
+        "headers": [],
+        "params": [
+          {
+            "name": "lat",
+            "value": "{{lat}}",
+            "type": "query",
+            "enabled": true
+          },
+          {
+            "name": "lon",
+            "value": "{{lon}}",
+            "type": "query",
+            "enabled": true
+          },
+          {
+            "name": "radius",
+            "value": "100",
+            "type": "query",
+            "enabled": true
+          }
+        ],
+        "body": {
+          "mode": "none"
+        },
+        "auth": {
+          "mode": "none"
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [
+          {
+            "name": "res.status",
+            "value": "eq 200",
+            "enabled": true
+          },
+          {
+            "name": "res.body.parkings.length",
+            "value": "eq 1",
+            "enabled": true
+          }
+        ],
+        "tests": "test(\"only the closest parking is returned\", function () {\n  expect(res.body.parkings[0].name).to.equal(\"THEATRE\");\n});",
+        "docs": ""
+      }
+    },
+    {
+      "type": "http-request",
+      "name": "Search parkings - no parking nearby (empty list)",
+      "seq": 4,
+      "request": {
+        "url": "{{baseUrl}}/api/v1/parkings?lat=46.65&lon=0.45&radius=100",
+        "method": "GET",
+        "headers": [],
+        "params": [
+          {
+            "name": "lat",
+            "value": "46.65",
+            "type": "query",
+            "enabled": true
+          },
+          {
+            "name": "lon",
+            "value": "0.45",
+            "type": "query",
+            "enabled": true
+          },
+          {
+            "name": "radius",
+            "value": "100",
+            "type": "query",
+            "enabled": true
+          }
+        ],
+        "body": {
+          "mode": "none"
+        },
+        "auth": {
+          "mode": "none"
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [
+          {
+            "name": "res.status",
+            "value": "eq 200",
+            "enabled": true
+          }
+        ],
+        "tests": "test(\"covered city without parking in the radius gives an empty list\", function () {\n  expect(res.body).to.deep.equal({ parkings: [] });\n});",
+        "docs": ""
+      }
+    },
+    {
+      "type": "http-request",
+      "name": "Error - missing coordinates",
+      "seq": 5,
+      "request": {
+        "url": "{{baseUrl}}/api/v1/parkings",
+        "method": "GET",
+        "headers": [],
+        "params": [],
+        "body": {
+          "mode": "none"
+        },
+        "auth": {
+          "mode": "none"
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [
+          {
+            "name": "res.status",
+            "value": "eq 400",
+            "enabled": true
+          }
+        ],
+        "tests": "test(\"problem+json\", function () {\n  expect(res.getHeader(\"content-type\")).to.contain(\"application/problem+json\");\n});\ntest(\"detail mentions: lat\", function () {\n  expect(res.body.detail).to.contain(\"lat\");\n});",
+        "docs": ""
+      }
+    },
+    {
+      "type": "http-request",
+      "name": "Error - missing longitude",
+      "seq": 6,
+      "request": {
+        "url": "{{baseUrl}}/api/v1/parkings?lat={{lat}}",
+        "method": "GET",
+        "headers": [],
+        "params": [
+          {
+            "name": "lat",
+            "value": "{{lat}}",
+            "type": "query",
+            "enabled": true
+          }
+        ],
+        "body": {
+          "mode": "none"
+        },
+        "auth": {
+          "mode": "none"
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [
+          {
+            "name": "res.status",
+            "value": "eq 400",
+            "enabled": true
+          }
+        ],
+        "tests": "test(\"problem+json\", function () {\n  expect(res.getHeader(\"content-type\")).to.contain(\"application/problem+json\");\n});\ntest(\"detail mentions: lon\", function () {\n  expect(res.body.detail).to.contain(\"lon\");\n});",
+        "docs": ""
+      }
+    },
+    {
+      "type": "http-request",
+      "name": "Error - latitude out of range",
+      "seq": 7,
+      "request": {
+        "url": "{{baseUrl}}/api/v1/parkings?lat=95&lon={{lon}}",
+        "method": "GET",
+        "headers": [],
+        "params": [
+          {
+            "name": "lat",
+            "value": "95",
+            "type": "query",
+            "enabled": true
+          },
+          {
+            "name": "lon",
+            "value": "{{lon}}",
+            "type": "query",
+            "enabled": true
+          }
+        ],
+        "body": {
+          "mode": "none"
+        },
+        "auth": {
+          "mode": "none"
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [
+          {
+            "name": "res.status",
+            "value": "eq 400",
+            "enabled": true
+          }
+        ],
+        "tests": "test(\"problem+json\", function () {\n  expect(res.getHeader(\"content-type\")).to.contain(\"application/problem+json\");\n});\ntest(\"detail mentions: lat must be between -90 and 90\", function () {\n  expect(res.body.detail).to.contain(\"lat must be between -90 and 90\");\n});",
+        "docs": ""
+      }
+    },
+    {
+      "type": "http-request",
+      "name": "Error - longitude out of range",
+      "seq": 8,
+      "request": {
+        "url": "{{baseUrl}}/api/v1/parkings?lat={{lat}}&lon=181",
+        "method": "GET",
+        "headers": [],
+        "params": [
+          {
+            "name": "lat",
+            "value": "{{lat}}",
+            "type": "query",
+            "enabled": true
+          },
+          {
+            "name": "lon",
+            "value": "181",
+            "type": "query",
+            "enabled": true
+          }
+        ],
+        "body": {
+          "mode": "none"
+        },
+        "auth": {
+          "mode": "none"
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [
+          {
+            "name": "res.status",
+            "value": "eq 400",
+            "enabled": true
+          }
+        ],
+        "tests": "test(\"problem+json\", function () {\n  expect(res.getHeader(\"content-type\")).to.contain(\"application/problem+json\");\n});\ntest(\"detail mentions: lon must be between -180 and 180\", function () {\n  expect(res.body.detail).to.contain(\"lon must be between -180 and 180\");\n});",
+        "docs": ""
+      }
+    },
+    {
+      "type": "http-request",
+      "name": "Error - latitude is NaN",
+      "seq": 9,
+      "request": {
+        "url": "{{baseUrl}}/api/v1/parkings?lat=NaN&lon={{lon}}",
+        "method": "GET",
+        "headers": [],
+        "params": [
+          {
+            "name": "lat",
+            "value": "NaN",
+            "type": "query",
+            "enabled": true
+          },
+          {
+            "name": "lon",
+            "value": "{{lon}}",
+            "type": "query",
+            "enabled": true
+          }
+        ],
+        "body": {
+          "mode": "none"
+        },
+        "auth": {
+          "mode": "none"
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [
+          {
+            "name": "res.status",
+            "value": "eq 400",
+            "enabled": true
+          }
+        ],
+        "tests": "test(\"problem+json\", function () {\n  expect(res.getHeader(\"content-type\")).to.contain(\"application/problem+json\");\n});\ntest(\"detail mentions: lat must be between -90 and 90\", function () {\n  expect(res.body.detail).to.contain(\"lat must be between -90 and 90\");\n});",
+        "docs": ""
+      }
+    },
+    {
+      "type": "http-request",
+      "name": "Error - latitude is not a number",
+      "seq": 10,
+      "request": {
+        "url": "{{baseUrl}}/api/v1/parkings?lat=abc&lon={{lon}}",
+        "method": "GET",
+        "headers": [],
+        "params": [
+          {
+            "name": "lat",
+            "value": "abc",
+            "type": "query",
+            "enabled": true
+          },
+          {
+            "name": "lon",
+            "value": "{{lon}}",
+            "type": "query",
+            "enabled": true
+          }
+        ],
+        "body": {
+          "mode": "none"
+        },
+        "auth": {
+          "mode": "none"
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [
+          {
+            "name": "res.status",
+            "value": "eq 400",
+            "enabled": true
+          }
+        ],
+        "tests": "test(\"problem+json\", function () {\n  expect(res.getHeader(\"content-type\")).to.contain(\"application/problem+json\");\n});\ntest(\"detail mentions: lat\", function () {\n  expect(res.body.detail).to.contain(\"lat\");\n});",
+        "docs": ""
+      }
+    },
+    {
+      "type": "http-request",
+      "name": "Error - radius too small",
+      "seq": 11,
+      "request": {
+        "url": "{{baseUrl}}/api/v1/parkings?lat={{lat}}&lon={{lon}}&radius=0",
+        "method": "GET",
+        "headers": [],
+        "params": [
+          {
+            "name": "lat",
+            "value": "{{lat}}",
+            "type": "query",
+            "enabled": true
+          },
+          {
+            "name": "lon",
+            "value": "{{lon}}",
+            "type": "query",
+            "enabled": true
+          },
+          {
+            "name": "radius",
+            "value": "0",
+            "type": "query",
+            "enabled": true
+          }
+        ],
+        "body": {
+          "mode": "none"
+        },
+        "auth": {
+          "mode": "none"
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [
+          {
+            "name": "res.status",
+            "value": "eq 400",
+            "enabled": true
+          }
+        ],
+        "tests": "test(\"problem+json\", function () {\n  expect(res.getHeader(\"content-type\")).to.contain(\"application/problem+json\");\n});\ntest(\"detail mentions: radius must be between 1 and 5000\", function () {\n  expect(res.body.detail).to.contain(\"radius must be between 1 and 5000\");\n});",
+        "docs": ""
+      }
+    },
+    {
+      "type": "http-request",
+      "name": "Error - radius too large",
+      "seq": 12,
+      "request": {
+        "url": "{{baseUrl}}/api/v1/parkings?lat={{lat}}&lon={{lon}}&radius=5001",
+        "method": "GET",
+        "headers": [],
+        "params": [
+          {
+            "name": "lat",
+            "value": "{{lat}}",
+            "type": "query",
+            "enabled": true
+          },
+          {
+            "name": "lon",
+            "value": "{{lon}}",
+            "type": "query",
+            "enabled": true
+          },
+          {
+            "name": "radius",
+            "value": "5001",
+            "type": "query",
+            "enabled": true
+          }
+        ],
+        "body": {
+          "mode": "none"
+        },
+        "auth": {
+          "mode": "none"
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [
+          {
+            "name": "res.status",
+            "value": "eq 400",
+            "enabled": true
+          }
+        ],
+        "tests": "test(\"problem+json\", function () {\n  expect(res.getHeader(\"content-type\")).to.contain(\"application/problem+json\");\n});\ntest(\"detail mentions: radius must be between 1 and 5000\", function () {\n  expect(res.body.detail).to.contain(\"radius must be between 1 and 5000\");\n});",
+        "docs": ""
+      }
+    },
+    {
+      "type": "http-request",
+      "name": "Error - city not covered (Paris)",
+      "seq": 13,
+      "request": {
+        "url": "{{baseUrl}}/api/v1/parkings?lat=48.8566&lon=2.3522",
+        "method": "GET",
+        "headers": [],
+        "params": [
+          {
+            "name": "lat",
+            "value": "48.8566",
+            "type": "query",
+            "enabled": true
+          },
+          {
+            "name": "lon",
+            "value": "2.3522",
+            "type": "query",
+            "enabled": true
+          }
+        ],
+        "body": {
+          "mode": "none"
+        },
+        "auth": {
+          "mode": "none"
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [
+          {
+            "name": "res.status",
+            "value": "eq 404",
+            "enabled": true
+          }
+        ],
+        "tests": "test(\"problem+json\", function () {\n  expect(res.getHeader(\"content-type\")).to.contain(\"application/problem+json\");\n});\ntest(\"title and detail\", function () {\n  expect(res.body.title).to.equal(\"City not covered\");\n  expect(res.body.detail).to.equal(\"No supported city at this position\");\n});",
+        "docs": ""
+      }
+    },
+    {
+      "type": "http-request",
+      "name": "Error - method not allowed",
+      "seq": 14,
+      "request": {
+        "url": "{{baseUrl}}/api/v1/parkings",
+        "method": "POST",
+        "headers": [],
+        "params": [],
+        "body": {
+          "mode": "none"
+        },
+        "auth": {
+          "mode": "none"
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [
+          {
+            "name": "res.status",
+            "value": "eq 405",
+            "enabled": true
+          }
+        ],
+        "tests": "",
+        "docs": ""
+      }
+    },
+    {
+      "type": "http-request",
+      "name": "Health",
+      "seq": 15,
+      "request": {
+        "url": "{{baseUrl}}/actuator/health",
+        "method": "GET",
+        "headers": [],
+        "params": [],
+        "body": {
+          "mode": "none"
+        },
+        "auth": {
+          "mode": "none"
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [
+          {
+            "name": "res.status",
+            "value": "eq 200",
+            "enabled": true
+          },
+          {
+            "name": "res.body.status",
+            "value": "eq UP",
+            "enabled": true
+          }
+        ],
+        "tests": "",
+        "docs": ""
+      }
+    },
+    {
+      "type": "http-request",
+      "name": "OpenAPI spec",
+      "seq": 16,
+      "request": {
+        "url": "{{baseUrl}}/v3/api-docs",
+        "method": "GET",
+        "headers": [],
+        "params": [],
+        "body": {
+          "mode": "none"
+        },
+        "auth": {
+          "mode": "none"
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [
+          {
+            "name": "res.status",
+            "value": "eq 200",
+            "enabled": true
+          },
+          {
+            "name": "res.body.paths[\"/api/v1/parkings\"]",
+            "value": "isDefined",
+            "enabled": true
+          }
+        ],
+        "tests": "",
+        "docs": ""
+      }
+    },
+    {
+      "type": "http-request",
+      "name": "CORS preflight - allowed origin",
+      "seq": 17,
+      "request": {
+        "url": "{{baseUrl}}/api/v1/parkings",
+        "method": "OPTIONS",
+        "headers": [
+          {
+            "name": "Origin",
+            "value": "http://localhost:3000",
+            "enabled": true
+          },
+          {
+            "name": "Access-Control-Request-Method",
+            "value": "GET",
+            "enabled": true
+          }
+        ],
+        "params": [],
+        "body": {
+          "mode": "none"
+        },
+        "auth": {
+          "mode": "none"
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [
+          {
+            "name": "res.status",
+            "value": "eq 200",
+            "enabled": true
+          }
+        ],
+        "tests": "test(\"origin is allowed\", function () {\n  expect(res.getHeader(\"access-control-allow-origin\")).to.equal(\"http://localhost:3000\");\n});",
+        "docs": ""
+      }
+    },
+    {
+      "type": "http-request",
+      "name": "CORS preflight - other origin",
+      "seq": 18,
+      "request": {
+        "url": "{{baseUrl}}/api/v1/parkings",
+        "method": "OPTIONS",
+        "headers": [
+          {
+            "name": "Origin",
+            "value": "https://evil.example",
+            "enabled": true
+          },
+          {
+            "name": "Access-Control-Request-Method",
+            "value": "GET",
+            "enabled": true
+          }
+        ],
+        "params": [],
+        "body": {
+          "mode": "none"
+        },
+        "auth": {
+          "mode": "none"
+        },
+        "script": {},
+        "vars": {},
+        "assertions": [
+          {
+            "name": "res.status",
+            "value": "eq 403",
+            "enabled": true
+          }
+        ],
+        "tests": "",
+        "docs": ""
+      }
+    }
+  ],
+  "environments": [
+    {
+      "name": "Local",
+      "variables": [
+        {
+          "name": "baseUrl",
+          "value": "http://localhost:8080",
+          "enabled": true,
+          "secret": false,
+          "type": "text"
+        },
+        {
+          "name": "lat",
+          "value": "46.5838",
+          "enabled": true,
+          "secret": false,
+          "type": "text"
+        },
+        {
+          "name": "lon",
+          "value": "0.3377",
+          "enabled": true,
+          "secret": false,
+          "type": "text"
+        },
+        {
+          "name": "radius",
+          "value": "1000",
+          "enabled": true,
+          "secret": false,
+          "type": "text"
+        }
+      ]
+    }
+  ],
+  "activeEnvironmentUid": null
+}

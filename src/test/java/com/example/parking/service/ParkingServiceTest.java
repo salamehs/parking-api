@@ -56,6 +56,20 @@ class ParkingServiceTest {
     }
 
     @Test
+    void noParkingInTheRadiusGivesAnEmptyList() {
+        ParkingService service = serviceWith(new FakeProvider(List.of(FAR)));
+
+        assertThat(service.findNearby(new SearchCriteria(46.5838, 0.3377, 1000))).isEmpty();
+    }
+
+    @Test
+    void coveredCityWithoutAnyParkingGivesAnEmptyList() {
+        ParkingService service = serviceWith(new FakeProvider(List.of()));
+
+        assertThat(service.findNearby(new SearchCriteria(46.5838, 0.3377, 1000))).isEmpty();
+    }
+
+    @Test
     void callsTheProviderOfTheCityThePositionBelongsTo() {
         FakeProvider provider = new FakeProvider(List.of());
         ParkingService service = serviceWith(provider);
