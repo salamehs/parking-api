@@ -1,0 +1,203 @@
+openapi: 3.1.0
+info:
+  title: Parking API
+  description: "Returns the nearby parkings, with their position and availability."
+  version: v1
+servers:
+- url: http://localhost
+  description: Generated server url
+tags:
+- name: Parking API
+  description: Search for parking facilities near a location
+paths:
+  /api/v1/parkings:
+    get:
+      tags:
+      - Parking API
+      summary: Find nearby parking facilities
+      description: |-
+        Searches for parking facilities within the requested radius of the supplied coordinates,
+        ordered from nearest to farthest. The radius defaults to 1,000 meters and can be set from
+        1 to 5,000 meters. The city is determined from the coordinates. An error is returned
+        if the request does not include coordinates or if no city is found for the supplied
+        coordinates.
+      operationId: findNearbyParkings
+      parameters:
+      - name: lat
+        in: query
+        description: Latitude of the search center (WGS 84)
+        required: true
+        schema:
+          type: number
+          format: double
+          maximum: 90.0
+          minimum: -90.0
+        example: 46.5838
+      - name: lon
+        in: query
+        description: Longitude of the search center (WGS 84)
+        required: true
+        schema:
+          type: number
+          format: double
+          maximum: 180.0
+          minimum: -180.0
+        example: 0.3377
+      - name: radius
+        in: query
+        description: Search radius in meters
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 1000
+          maximum: 5000
+          minimum: 1
+        example: 1000
+      responses:
+        "200":
+          description: "Parkings within the radius, nearest first (may be empty)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ParkingsResponse"
+        "400":
+          description: "Missing, non-numeric or out-of-range parameter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+              example:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                detail: "Invalid request parameters: lat must be between -90 and 90"
+                instance: /api/v1/parkings
+        "404":
+          description: No covered city at this position
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+              example:
+                type: about:blank
+                title: City not covered
+                status: 404
+                detail: No supported city at this position
+                instance: /api/v1/parkings
+        "500":
+          description: Unexpected error
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+              example:
+                type: about:blank
+                title: Internal Server Error
+                status: 500
+                detail: An unexpected error occurred
+                instance: /api/v1/parkings
+        "502":
+          description: The city's provider failed or returned an unreadable answer
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+              example:
+                type: about:blank
+                title: Provider failure
+                status: 502
+                detail: The parking data source is currently unavailable
+                instance: /api/v1/parkings
+        "504":
+          description: The city's provider did not answer in time
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+              example:
+                type: about:blank
+                title: Provider timeout
+                status: 504
+                detail: The parking data source did not answer in time
+                instance: /api/v1/parkings
+components:
+  schemas:
+    Parking:
+      type: object
+      description: A parking near the searched position
+      properties:
+        name:
+          type: string
+          description: Parking name shown to the user
+          example: THEATRE
+        latitude:
+          type: number
+          format: double
+          description: Parking latitude in WGS 84
+          example: 46.58383455409422
+        longitude:
+          type: number
+          format: double
+          description: Parking longitude in WGS 84
+          example: 0.33779491061805567
+        distanceMeters:
+          type: integer
+          format: int32
+          description: "Distance from the search point in meters, computed by this\
+            \ API"
+          example: 8
+        availableSpaces:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: "Number of free spaces right now, if the provider gives it"
+          example: 93
+        totalSpaces:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: "Total number of spaces, if the provider gives it"
+          example: 320
+      required:
+      - distanceMeters
+      - latitude
+      - longitude
+      - name
+    ParkingsResponse:
+      type: object
+      description: List of parkings near the searched position
+      properties:
+        parkings:
+          type: array
+          description: Parkings sorted from nearest to farthest
+          items:
+            $ref: "#/components/schemas/Parking"
+      required:
+      - parkings
+    Problem:
+      description: RFC 9457 problem details returned on errors
+      properties:
+        type:
+          type: string
+          description: Problem type
+          example: about:blank
+        title:
+          type: string
+          description: Short error title
+          example: Bad Request
+        status:
+          type: integer
+          format: int32
+          description: HTTP status code
+          example: 400
+        detail:
+          type: string
+          description: Human-readable error message
+          example: "Invalid request parameters: lat must be between -90 and 90"
+        instance:
+          type: string
+          description: Request path
+          example: /api/v1/parkings
